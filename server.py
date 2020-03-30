@@ -36,9 +36,12 @@ class BaseRequestHandler(socketserver.BaseRequestHandler):
               (now, self.__class__.__name__, self.client_address[0], self.client_address[1]))
         try:
             data = self.get_data()
-            response_packets = handle_dns_client(data)
-            for resp_packet in response_packets:
-                self.send_data(resp_packet)
+            if is_registration_request(data):
+                handle_domain_registration(data)
+            else:
+                response_packets = handle_dns_client(data)
+                for resp_packet in response_packets:
+                    self.send_data(resp_packet)
         except Exception:
             traceback.print_exc(file=sys.stderr)
 
@@ -100,6 +103,14 @@ class DNSResourceRecord:
 dns_resource_records = []
 
 
+def is_registration_request(data):
+    try:
+        request = DNSRecord.parse(data)
+        return False
+    except Exception:
+        return True
+
+
 def db_lookup(request):
     question = request.q
     if question.qname == "www.google.com" and question.qtype == QTYPE.A and question.qclass == CLASS.IN:
@@ -120,6 +131,10 @@ def handle_dns_client(data):
     return questions_answers
 
 
+def handle_domain_registration(data):
+    print("Starting domain registration: %s" % data)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Simple DNS implementation in Python.')
     parser.add_argument('--request_port', default=2053, type=int, help='The server port to listen for DNS Clients.')
@@ -135,7 +150,6 @@ def main():
         servers.append(socketserver.ThreadingUDPServer(('', args.register_port), UDPRequestHandler))
     if args.tcp:
         servers.append(socketserver.ThreadingTCPServer(('', args.request_port), TCPRequestHandler))
-        servers.append(socketserver.ThreadingTCPServer(('', args.register_port), TCPRequestHandler))
 
     for server in servers:
         thread = threading.Thread(target=server.serve_forever)
