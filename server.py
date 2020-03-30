@@ -22,26 +22,6 @@ except ImportError:
     install('dnslib')
 
 
-def db_lookup(request):
-    question = request.q
-    if question.qname == "www.google.com" and question.qtype == QTYPE.A and question.qclass == CLASS.IN:
-        answer = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
-        answer.add_answer(RR("www.google.com", QTYPE.A, ttl=60, rdata=A("1.2.3.4")))
-        # answer.add_auth(RR())
-        # answer.add_ar(RR())
-        return answer.pack()
-
-
-def handle_dns_client(data):
-    request = DNSRecord.parse(data)
-    questions_number = len(request.questions)
-    questions_answers = []
-    for i in range(questions_number):
-        packed_answer = db_lookup(request)
-        questions_answers.append(packed_answer)
-    return questions_answers
-
-
 class BaseRequestHandler(socketserver.BaseRequestHandler):
 
     def get_data(self):
@@ -90,9 +70,60 @@ class UDPRequestHandler(BaseRequestHandler):
         return self.request[1].sendto(data, self.client_address)
 
 
+class DNSResourceRecord:
+    domain_name: string
+    record_type: QTYPE
+    record_class: CLASS
+    ttl: int
+    data_length: int
+    data: bytearray
+
+    def get_domain_name(self):
+        return self.domain_name
+
+    def get_record_type(self):
+        return self.record_type
+
+    def get_record_class(self):
+        return self.record_class
+
+    def get_ttl(self):
+        return self.ttl
+
+    def get_data_length(self):
+        return self.data_length
+
+    def get_data(self):
+        return self.data
+
+
+dns_resource_records = []
+
+
+def db_lookup(request):
+    question = request.q
+    if question.qname == "www.google.com" and question.qtype == QTYPE.A and question.qclass == CLASS.IN:
+        answer = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
+        answer.add_answer(RR("www.google.com", QTYPE.A, ttl=60, rdata=A("1.2.3.4")))
+        # answer.add_auth(RR())
+        # answer.add_ar(RR())
+        return answer.pack()
+
+
+def handle_dns_client(data):
+    request = DNSRecord.parse(data)
+    questions_number = len(request.questions)
+    questions_answers = []
+    for i in range(questions_number):
+        packed_answer = db_lookup(request)
+        questions_answers.append(packed_answer)
+    return questions_answers
+
+
 def main():
     parser = argparse.ArgumentParser(description='Simple DNS implementation in Python.')
-    parser.add_argument('--port', default=2053, type=int, help='The server port to listen on.')
+    parser.add_argument('--request_port', default=2053, type=int, help='The server port to listen for DNS Clients.')
+    parser.add_argument('--register_port', default=2063, type=int, help='The server port to listen for registrations.')
     parser.add_argument('--udp', default=True, help='Listen to UDP.')
     parser.add_argument('--tcp', help='Listen to TCP.')
 
@@ -100,9 +131,11 @@ def main():
 
     servers = []
     if args.udp:
-        servers.append(socketserver.ThreadingUDPServer(('', args.port), UDPRequestHandler))
+        servers.append(socketserver.ThreadingUDPServer(('', args.request_port), UDPRequestHandler))
+        servers.append(socketserver.ThreadingUDPServer(('', args.register_port), UDPRequestHandler))
     if args.tcp:
-        servers.append(socketserver.ThreadingTCPServer(('', args.port), TCPRequestHandler))
+        servers.append(socketserver.ThreadingTCPServer(('', args.request_port), TCPRequestHandler))
+        servers.append(socketserver.ThreadingTCPServer(('', args.register_port), TCPRequestHandler))
 
     for server in servers:
         thread = threading.Thread(target=server.serve_forever)
