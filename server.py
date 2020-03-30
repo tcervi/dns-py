@@ -78,26 +78,14 @@ class DNSResourceRecord:
     record_type: QTYPE
     record_class: CLASS
     ttl: int
-    data_length: int
-    data: bytearray
+    data: string
 
-    def get_domain_name(self):
-        return self.domain_name
-
-    def get_record_type(self):
-        return self.record_type
-
-    def get_record_class(self):
-        return self.record_class
-
-    def get_ttl(self):
-        return self.ttl
-
-    def get_data_length(self):
-        return self.data_length
-
-    def get_data(self):
-        return self.data
+    def __init__(self, domain_name, record_type, record_class, data, ttl=300):
+        self.domain_name = domain_name
+        self.record_type = record_type
+        self.record_class = record_class
+        self.ttl = ttl
+        self.data = data
 
 
 dns_resource_records = []
@@ -133,6 +121,15 @@ def handle_dns_client(data):
 
 def handle_domain_registration(data):
     print("Starting domain registration: %s" % data)
+    data_str = data.decode('utf-8')
+    registration = data_str.split()
+    if len(registration) != 4:
+        return
+    new_record = DNSResourceRecord(registration[0], registration[1], registration[2], registration[3], 3600)
+    if new_record is not None:
+        dns_resource_records.append(new_record)
+        print("Registered domain: [%s,%s,%s,%s]" %
+          (new_record.domain_name, new_record.record_type, new_record.record_class, new_record.data))
 
 
 def main():
