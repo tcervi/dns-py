@@ -27,8 +27,8 @@ def db_lookup(request):
     if question.qname == "www.google.com" and question.qtype == QTYPE.A and question.qclass == CLASS.IN:
         answer = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
         answer.add_answer(RR("www.google.com", QTYPE.A, ttl=60, rdata=A("1.2.3.4")))
-        answer.add_auth(RR())
-        answer.add_ar(RR())
+        # answer.add_auth(RR())
+        # answer.add_ar(RR())
         return answer.pack()
 
 
@@ -56,8 +56,9 @@ class BaseRequestHandler(socketserver.BaseRequestHandler):
               (now, self.__class__.__name__, self.client_address[0], self.client_address[1]))
         try:
             data = self.get_data()
-            resp = 'test'
-            self.send_data(resp.encode())
+            response_packets = handle_dns_client(data)
+            for resp_packet in response_packets:
+                self.send_data(resp_packet)
         except Exception:
             traceback.print_exc(file=sys.stderr)
 
