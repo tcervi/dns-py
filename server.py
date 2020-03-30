@@ -99,14 +99,28 @@ def is_registration_request(data):
         return True
 
 
+def check_domain_entry(domain_name, domain_type, domain_class):
+    result_entry = None
+    for record in dns_resource_records:
+        if isinstance(record, DNSResourceRecord) \
+                and record.domain_name == str(domain_name)[:-1] \
+                and record.record_type == domain_type \
+                and record.record_class == domain_class:
+            result_entry = record
+    return result_entry
+
+
 def db_lookup(request):
     question = request.q
-    if question.qname == "www.google.com" and question.qtype == QTYPE.A and question.qclass == CLASS.IN:
+    if check_domain_entry(question.qname, QTYPE[question.qtype], CLASS[question.qclass]) is not None:
         answer = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
         answer.add_answer(RR("www.google.com", QTYPE.A, ttl=60, rdata=A("1.2.3.4")))
         # answer.add_auth(RR())
         # answer.add_ar(RR())
         return answer.pack()
+    else:
+        # TODO Handle error
+        return None
 
 
 def handle_dns_client(data):
@@ -120,16 +134,16 @@ def handle_dns_client(data):
 
 
 def handle_domain_registration(data):
-    print("Starting domain registration: %s" % data)
     data_str = data.decode('utf-8')
     registration = data_str.split()
     if len(registration) != 4:
         return
-    new_record = DNSResourceRecord(registration[0], registration[1], registration[2], registration[3], 3600)
+    # registration string like "www.google.com IN A 1.2.3.4"
+    new_record = DNSResourceRecord(registration[0], registration[2], registration[1], registration[3], 3600)
     if new_record is not None:
         dns_resource_records.append(new_record)
-        print("Registered domain: [%s,%s,%s,%s]" %
-          (new_record.domain_name, new_record.record_type, new_record.record_class, new_record.data))
+        print("Registered domain: [%s %s %s %s]" %
+              (new_record.domain_name, new_record.record_class, new_record.record_type, new_record.data))
 
 
 def main():
