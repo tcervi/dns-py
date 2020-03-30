@@ -99,25 +99,49 @@ def is_registration_request(data):
         return True
 
 
-def check_domain_entry(domain_name, domain_type, domain_class):
-    result_entry = None
-    for record in dns_resource_records:
+def check_domain_entry(domain_name, domain_class):
+    result_entry = []
+    for name, record in dns_resource_records:
+        if name != str(domain_name)[:-1]:
+            continue
+        # TODO Handle CNAME sequence
         if isinstance(record, DNSResourceRecord) \
                 and record.domain_name == str(domain_name)[:-1] \
-                and record.record_type == domain_type \
                 and record.record_class == domain_class:
-            result_entry = record
+            result_entry.append(record)
     return result_entry
+
+
+def get_data_by_type(record_type, data):
+    if record_type == QTYPE[1]:
+        return 1, A(data)
+    elif record_type == QTYPE[5]:
+        return 5, CNAME(data)
+    elif record_type == QTYPE[16]:
+        return 16, TXT(data)
+    elif record_type == QTYPE[28]:
+        return 28, AAAA(data)
+    else:
+        return None
+
+
+def handle_domain_entries(request, entries):
+    answer = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
+    for entry in entries:
+        data = get_data_by_type(entry.record_type, entry.data)
+        if data is None:
+            continue
+        answer.add_answer(RR(entry.domain_name, data[0], ttl=entry.ttl, rdata=data[1]))
+    # answer.add_auth(RR())
+    # answer.add_ar(RR())
+    return answer.pack()
 
 
 def db_lookup(request):
     question = request.q
-    if check_domain_entry(question.qname, QTYPE[question.qtype], CLASS[question.qclass]) is not None:
-        answer = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
-        answer.add_answer(RR("www.google.com", QTYPE.A, ttl=60, rdata=A("1.2.3.4")))
-        # answer.add_auth(RR())
-        # answer.add_ar(RR())
-        return answer.pack()
+    domain_entries = check_domain_entry(question.qname, CLASS[question.qclass])
+    if len(domain_entries) != 0:
+        return handle_domain_entries(request, domain_entries)
     else:
         # TODO Handle error
         return None
@@ -134,6 +158,7 @@ def handle_dns_client(data):
 
 
 def handle_domain_registration(data):
+    # TODO Handle reading error
     data_str = data.decode('utf-8')
     registration = data_str.split()
     if len(registration) != 4:
@@ -141,7 +166,7 @@ def handle_domain_registration(data):
     # registration string like "www.google.com IN A 1.2.3.4"
     new_record = DNSResourceRecord(registration[0], registration[2], registration[1], registration[3], 3600)
     if new_record is not None:
-        dns_resource_records.append(new_record)
+        dns_resource_records.append([new_record.domain_name, new_record])
         print("Registered domain: [%s %s %s %s]" %
               (new_record.domain_name, new_record.record_class, new_record.record_type, new_record.data))
 
