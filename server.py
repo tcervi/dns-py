@@ -22,6 +22,26 @@ except ImportError:
     install('dnslib')
 
 
+def db_lookup(request):
+    question = request.q
+    if question.qname == "www.google.com" and question.qtype == QTYPE.A and question.qclass == CLASS.IN:
+        answer = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
+        answer.add_answer(RR("www.google.com", QTYPE.A, ttl=60, rdata=A("1.2.3.4")))
+        answer.add_auth(RR())
+        answer.add_ar(RR())
+        return answer.pack()
+
+
+def handle_dns_client(data):
+    request = DNSRecord.parse(data)
+    questions_number = len(request.questions)
+    questions_answers = []
+    for i in range(questions_number):
+        packed_answer = db_lookup(request)
+        questions_answers.append(packed_answer)
+    return questions_answers
+
+
 class BaseRequestHandler(socketserver.BaseRequestHandler):
 
     def get_data(self):
