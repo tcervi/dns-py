@@ -94,8 +94,11 @@ def domain_registration():
             break
         else:
             now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-            handle_domain_registration(domain_entry)
-            print('[%s] - You entered new domain: [%s]' % (now, domain_entry))
+            registration_result = handle_domain_registration(domain_entry)
+            if registration_result:
+                print('[%s] - You entered new domain: [%s]' % (now, domain_entry))
+            else:
+                print('[%s] - You entered an invalid domain: [%s]' % (now, domain_entry))
             time.sleep(3)
     print('Finished domain registration interface.')
     print('So long, and thanks for all the fish!')
@@ -180,8 +183,8 @@ def handle_domain_registration(data_str):
 
     domain_dic = validate_new_domain(data_str)
     if domain_dic is None:
-        # TODO handle error
-        return
+        print("FAILED to validate: [%s]" % data_str)
+        return False
 
     new_record = DNSResourceRecord(domain_dic['domain_name'], domain_dic['class'],
                                    domain_dic['qtype'], domain_dic['data'], domain_dic['ttl'])
@@ -191,8 +194,9 @@ def handle_domain_registration(data_str):
               (new_record.domain_name, new_record.record_class, new_record.record_type, new_record.data))
         pickle.dump(resource_records, open("records.p", "wb"))
     else:
-        # TODO handle error
-        return
+        print("FAILED to create new record: [%s]" % domain_dic)
+        return False
+    return True
 
 
 def validate_new_domain(data_str):
