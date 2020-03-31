@@ -240,7 +240,7 @@ def validate_domain_name(domain_name):
             return None
     # RFC1035: must start with a letter, end with a letter or digit,
     # and have as interior characters only letters, digits, and hyphen
-    if not re.match(r"^[a-zA-Z]", domain_name) or not re.match(r"[a-zA-Z.]$", domain_name):
+    if not re.match(r"^[a-zA-Z]", domain_name) or not re.match(r".*[a-zA-Z.]$", domain_name):
         return None
     if re.match(r"[^a-zA-Z0-9.-]", domain_name):
         return None
