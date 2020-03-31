@@ -95,7 +95,7 @@ def domain_registration():
             now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             handle_domain_registration(domain_entry)
             print('[%s] - You entered new domain: [%s]' % (now, domain_entry))
-            time.sleep(5)
+            time.sleep(3)
     print('Finished domain registration interface.')
     print('So long, and thanks for all the fish!')
 
@@ -176,7 +176,6 @@ def handle_dns_client(data):
 
 def handle_domain_registration(data_str):
     resource_records = pickle.load(open("records.p", "rb"))
-    # TODO validation rules
     registration = data_str.split()
     if len(registration) != 4:
         return
@@ -210,10 +209,11 @@ def main():
         thread.start()
         print("%s server running: [%s]" % (server.RequestHandlerClass.__name__, thread.name))
 
-    # starting server with one fake entry
-    record = DNSResourceRecord("www.google.com", "A", "IN", "1.2.3.4", 3600)
-    dns_resource_records = [[record.domain_name, record]]
-    pickle.dump(dns_resource_records, open("records.p", "wb"))
+    # starting server with one fake entry (first run)
+    # record = DNSResourceRecord("www.google.com", "A", "IN", "1.2.3.4", 3600)
+    # dns_resource_records = [[record.domain_name, record]]
+    # pickle.dump(dns_resource_records, open("records.p", "wb"))
+
     # starting cli process for registration
     registration_process = Process(target=domain_registration)
     registration_process.start()
