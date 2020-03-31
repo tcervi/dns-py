@@ -1,5 +1,7 @@
 import argparse
 import datetime
+from multiprocessing import Process
+import pickle
 import subprocess
 import sys
 import socketserver
@@ -20,6 +22,12 @@ except ImportError:
     print("Missing dependency dnslib: <https://pypi.python.org/pypi/dnslib>.")
     print("Installing dnslib now with `pip`:")
     install('dnslib')
+try:
+    from prompt_toolkit import prompt
+except ImportError:
+    print("Missing dependency prompt_toolkit: <https://python-prompt-toolkit.readthedocs.io/en/stable/index.html>.")
+    print("Installing prompt_toolkit now with `pip`:")
+    install('prompt_toolkit')
 
 
 class BaseRequestHandler(socketserver.BaseRequestHandler):
@@ -36,12 +44,9 @@ class BaseRequestHandler(socketserver.BaseRequestHandler):
               (now, self.__class__.__name__, self.client_address[0], self.client_address[1]))
         try:
             data = self.get_data()
-            if is_registration_request(data):
-                handle_domain_registration(data)
-            else:
-                response_packets = handle_dns_client(data)
-                for resp_packet in response_packets:
-                    self.send_data(resp_packet)
+            response_packets = handle_dns_client(data)
+            for resp_packet in response_packets:
+                self.send_data(resp_packet)
         except Exception:
             traceback.print_exc(file=sys.stderr)
 
@@ -73,6 +78,21 @@ class UDPRequestHandler(BaseRequestHandler):
         return self.request[1].sendto(data, self.client_address)
 
 
+def domain_registration():
+    sys.stdin = open(0)
+    while True:
+        try:
+            domain_entry = prompt('> Enter domain: ')
+        except KeyboardInterrupt:
+            continue
+        except EOFError:
+            break
+        else:
+            print('You entered: [%s]' % domain_entry)
+            handle_domain_registration(domain_entry)
+    print('GoodBye!')
+
+
 class DNSResourceRecord:
     domain_name: string
     record_type: QTYPE
@@ -88,20 +108,10 @@ class DNSResourceRecord:
         self.data = data
 
 
-dns_resource_records = []
-
-
-def is_registration_request(data):
-    try:
-        request = DNSRecord.parse(data)
-        return False
-    except Exception:
-        return True
-
-
 def check_domain_entry(domain_name, domain_class):
     result_entry = []
-    for name, record in dns_resource_records:
+    resource_records = pickle.load(open("records.p", "rb"))
+    for name, record in resource_records:
         if name != str(domain_name)[:-1]:
             continue
         # TODO Handle CNAME sequence
@@ -157,18 +167,19 @@ def handle_dns_client(data):
     return questions_answers
 
 
-def handle_domain_registration(data):
-    # TODO Handle reading error
-    data_str = data.decode('utf-8')
+def handle_domain_registration(data_str):
+    resource_records = pickle.load(open("records.p", "rb"))
+    # TODO validation rules
     registration = data_str.split()
     if len(registration) != 4:
         return
     # registration string like "www.google.com IN A 1.2.3.4"
     new_record = DNSResourceRecord(registration[0], registration[2], registration[1], registration[3], 3600)
     if new_record is not None:
-        dns_resource_records.append([new_record.domain_name, new_record])
+        resource_records.append([new_record.domain_name, new_record])
         print("Registered domain: [%s %s %s %s]" %
               (new_record.domain_name, new_record.record_class, new_record.record_type, new_record.data))
+    pickle.dump(resource_records, open("records.p", "wb"))
 
 
 def main():
@@ -177,13 +188,15 @@ def main():
     parser.add_argument('--register_port', default=2063, type=int, help='The server port to listen for registrations.')
     parser.add_argument('--udp', default=True, help='Listen to UDP.')
     parser.add_argument('--tcp', help='Listen to TCP.')
-
     args = parser.parse_args()
+
+    record = DNSResourceRecord("www.google.com", "A", "IN", "1.2.3.4", 3600)
+    dns_resource_records = [[record.domain_name, record]]
+    pickle.dump(dns_resource_records, open("records.p", "wb"))
 
     servers = []
     if args.udp:
         servers.append(socketserver.ThreadingUDPServer(('', args.request_port), UDPRequestHandler))
-        servers.append(socketserver.ThreadingUDPServer(('', args.register_port), UDPRequestHandler))
     if args.tcp:
         servers.append(socketserver.ThreadingTCPServer(('', args.request_port), TCPRequestHandler))
 
@@ -192,6 +205,10 @@ def main():
         thread.daemon = True
         thread.start()
         print("%s server running: [%s]" % (server.RequestHandlerClass.__name__, thread.name))
+
+    registration_process = Process(target=domain_registration)
+    registration_process.start()
+    registration_process.join()
 
     try:
         while True:
