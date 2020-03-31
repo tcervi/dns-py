@@ -2,6 +2,7 @@ import argparse
 import datetime
 from multiprocessing import Process
 import pickle
+import re
 import subprocess
 import sys
 import socketserver
@@ -102,12 +103,12 @@ def domain_registration():
 
 class DNSResourceRecord:
     domain_name: string
-    record_type: QTYPE
     record_class: CLASS
+    record_type: QTYPE
     ttl: int
     data: string
 
-    def __init__(self, domain_name, record_type, record_class, data, ttl=300):
+    def __init__(self, domain_name, record_class, record_type, data, ttl=300):
         self.domain_name = domain_name
         self.record_type = record_type
         self.record_class = record_class
@@ -176,16 +177,120 @@ def handle_dns_client(data):
 
 def handle_domain_registration(data_str):
     resource_records = pickle.load(open("records.p", "rb"))
-    registration = data_str.split()
-    if len(registration) != 4:
+
+    domain_dic = validate_new_domain(data_str)
+    if domain_dic is None:
+        # TODO handle error
         return
-    # registration string like "www.google.com IN A 1.2.3.4"
-    new_record = DNSResourceRecord(registration[0], registration[2], registration[1], registration[3], 3600)
+
+    new_record = DNSResourceRecord(domain_dic['domain_name'], domain_dic['class'],
+                                   domain_dic['qtype'], domain_dic['data'], domain_dic['ttl'])
     if new_record is not None:
         resource_records.append([new_record.domain_name, new_record])
         print("Registered domain: [%s %s %s %s]" %
               (new_record.domain_name, new_record.record_class, new_record.record_type, new_record.data))
-    pickle.dump(resource_records, open("records.p", "wb"))
+        pickle.dump(resource_records, open("records.p", "wb"))
+    else:
+        # TODO handle error
+        return
+
+
+def validate_new_domain(data_str):
+    # registration string like "www.google.com IN A 1.2.3.4"
+    registration = data_str.split()
+    if len(registration) != 4:
+        return None
+
+    new_domain_name = validate_domain_name(registration[0])
+    if new_domain_name is None:
+        return None
+
+    new_domain_class = validate_domain_class(registration[1])
+    if new_domain_class is None:
+        return None
+
+    new_domain_type = validate_domain_type(registration[2])
+    if new_domain_type is None:
+        return None
+
+    new_domain_data = validate_domain_data(new_domain_type, registration[3])
+    if new_domain_data is None:
+        return None
+
+    domain_dic = {'domain_name': new_domain_name, 'class': new_domain_class,
+                  'qtype': new_domain_type, 'data': new_domain_data, 'ttl': 3600}
+    return domain_dic
+
+
+def validate_domain_name(domain_name):
+    # For sequences, (strings, lists, tuples), use the fact that empty sequences are false.
+    if not domain_name:
+        return None
+    # RFC1035: names - 255 octets or less
+    if len(domain_name) > 255:
+        return None
+    # RFC1035: labels - 63 octets or less
+    labels = domain_name.split('.')
+    for domain_label in labels:
+        if len(domain_label) > 63:
+            return None
+    # RFC1035: must start with a letter, end with a letter or digit,
+    # and have as interior characters only letters, digits, and hyphen
+    if not re.match(r"^[a-zA-Z]", domain_name) or not re.match(r"[a-zA-Z.]$", domain_name):
+        return None
+    if re.match(r"[^a-zA-Z0-9.-]", domain_name):
+        return None
+    return domain_name
+
+
+def validate_domain_class(domain_class):
+    # CLASS =  Bimap('CLASS', {1:'IN', 2:'CS', 3:'CH', 4:'Hesiod', 254:'None', 255:'*'},DNSError)
+    if domain_class != CLASS[1] and domain_class != CLASS[2] and domain_class != CLASS[3] and \
+            domain_class != CLASS[4] and domain_class != CLASS[254] and domain_class != CLASS[255]:
+        return None
+    else:
+        return domain_class
+
+
+def validate_domain_type(domain_type):
+    # TYPE = Bimap('QTYPE', {1:'A',..., 5:'CNAME',..., 16:'TXT',..., 28:'AAAA',...}, DNSError)
+    if domain_type != QTYPE[1] and domain_type != QTYPE[5] and \
+            domain_type != QTYPE[16] and domain_type != QTYPE[28]:
+        return None
+    else:
+        return domain_type
+
+
+def validate_domain_data(domain_type, domain_data):
+    # TYPE            value and meaning [RFC1035]
+
+    # A               1 a host address (x.y.z.w)
+    if domain_type == QTYPE[1] and \
+            not re.match(r"^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$", domain_data):
+        return None
+    # AAAA            1 a host address (A:B:C:D:E:F:G:H) [RFC3596]
+    if domain_type == QTYPE[28] and \
+            not re.match(
+                r"(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,"
+                r"6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,"
+                r"4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,"
+                r"2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,"
+                r"7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2["
+                r"0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,"
+                r"4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))",
+                domain_data):
+        return None
+    # CNAME           5 the canonical name for an alias
+    if domain_type == QTYPE[5] and validate_domain_name(domain_data) is None:
+        return None
+    # TXT             16 text strings
+    # [RFC1464] The format consists of the attribute name followed by the value of the attribute.
+    # The name and value are separated by an equals sign (=)
+    # Any printable ASCII character is permitted for the attribute name.
+    # All printable ASCII characters are permitted in the attribute value
+    if domain_type == QTYPE[16] and not re.match(r"[=]", domain_data):
+        return None
+    return domain_data
 
 
 def main():
@@ -208,11 +313,6 @@ def main():
         thread.daemon = True
         thread.start()
         print("%s server running: [%s]" % (server.RequestHandlerClass.__name__, thread.name))
-
-    # starting server with one fake entry (first run)
-    # record = DNSResourceRecord("www.google.com", "A", "IN", "1.2.3.4", 3600)
-    # dns_resource_records = [[record.domain_name, record]]
-    # pickle.dump(dns_resource_records, open("records.p", "wb"))
 
     # starting cli process for registration
     registration_process = Process(target=domain_registration)
