@@ -82,15 +82,22 @@ def domain_registration():
     sys.stdin = open(0)
     while True:
         try:
-            domain_entry = prompt('> Enter domain: ')
+            os.system('clear')
+            print("You can register new domains typing it in a single line ")
+            print("separating fields with whitespaces:  domain_name domain_class domain_type address/info")
+            print("Example: www.google.com IN A 1.2.3.4")
+            domain_entry = prompt('>>>> Enter domain: ')
         except KeyboardInterrupt:
             continue
         except EOFError:
             break
         else:
-            print('You entered: [%s]' % domain_entry)
+            now = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
             handle_domain_registration(domain_entry)
-    print('GoodBye!')
+            print('[%s] - You entered new domain: [%s]' % (now, domain_entry))
+            time.sleep(5)
+    print('Finished domain registration interface.')
+    print('So long, and thanks for all the fish!')
 
 
 class DNSResourceRecord:
@@ -190,10 +197,7 @@ def main():
     parser.add_argument('--tcp', help='Listen to TCP.')
     args = parser.parse_args()
 
-    record = DNSResourceRecord("www.google.com", "A", "IN", "1.2.3.4", 3600)
-    dns_resource_records = [[record.domain_name, record]]
-    pickle.dump(dns_resource_records, open("records.p", "wb"))
-
+    # starting servers with respective sockets handling
     servers = []
     if args.udp:
         servers.append(socketserver.ThreadingUDPServer(('', args.request_port), UDPRequestHandler))
@@ -206,6 +210,11 @@ def main():
         thread.start()
         print("%s server running: [%s]" % (server.RequestHandlerClass.__name__, thread.name))
 
+    # starting server with one fake entry
+    record = DNSResourceRecord("www.google.com", "A", "IN", "1.2.3.4", 3600)
+    dns_resource_records = [[record.domain_name, record]]
+    pickle.dump(dns_resource_records, open("records.p", "wb"))
+    # starting cli process for registration
     registration_process = Process(target=domain_registration)
     registration_process.start()
     registration_process.join()
