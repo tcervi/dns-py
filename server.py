@@ -267,7 +267,9 @@ def validate_domain_type(domain_type):
 
 def validate_domain_data(domain_type, domain_data):
     # TYPE            value and meaning [RFC1035]
-
+    if domain_data is None or \
+            not isinstance(domain_type, str) or not isinstance(domain_data, str):
+        return None
     # A               1 a host address (x.y.z.w)
     if domain_type == QTYPE[1] and \
             not re.match(r"^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$", domain_data):
