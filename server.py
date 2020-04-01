@@ -323,6 +323,14 @@ def main():
         thread.start()
         print("%s server running: [%s]" % (server.RequestHandlerClass.__name__, thread.name))
 
+    # starting server with one fake entry (first run)
+    # not mandatory, can be removed later
+    resource_records = pickle.load(open("records.p", "rb"))
+    if len(resource_records) == 0:
+        record = DNSResourceRecord("www.google.com", "A", "IN", "1.2.3.4", 3600)
+        dns_resource_records = [[record.domain_name, record]]
+        pickle.dump(dns_resource_records, open("records.p", "wb"))
+
     # starting cli process for registration
     registration_process = Process(target=domain_registration)
     registration_process.start()
