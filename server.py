@@ -201,6 +201,9 @@ def handle_domain_registration(data_str):
 
 def validate_new_domain(data_str):
     # registration string like "www.google.com IN A 1.2.3.4"
+    if not isinstance(data_str, str):
+        return None
+
     registration = data_str.split()
     if len(registration) != 4:
         return None
@@ -242,7 +245,7 @@ def validate_domain_name(domain_name):
     # and have as interior characters only letters, digits, and hyphen
     if not re.match(r"^[a-zA-Z]", domain_name) or not re.match(r".*[a-zA-Z.]$", domain_name):
         return None
-    if re.match(r"[^a-zA-Z0-9.-]", domain_name):
+    if re.match(r".*[^\w\.\-]", domain_name):
         return None
     return domain_name
 
