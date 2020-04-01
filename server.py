@@ -294,7 +294,7 @@ def validate_domain_data(domain_type, domain_data):
     # The name and value are separated by an equals sign (=)
     # Any printable ASCII character is permitted for the attribute name.
     # All printable ASCII characters are permitted in the attribute value
-    if domain_type == QTYPE[16] and not re.match(r"[=]", domain_data):
+    if domain_type == QTYPE[16] and not re.match(r".*[=]", domain_data):
         return None
     return domain_data
 
