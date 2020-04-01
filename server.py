@@ -79,6 +79,21 @@ class UDPRequestHandler(BaseRequestHandler):
         return self.request[1].sendto(data, self.client_address)
 
 
+class DNSResourceRecord:
+    domain_name: string
+    record_class: CLASS
+    record_type: QTYPE
+    ttl: int
+    data: string
+
+    def __init__(self, domain_name, record_class, record_type, data, ttl=300):
+        self.domain_name = domain_name
+        self.record_type = record_type
+        self.record_class = record_class
+        self.ttl = ttl
+        self.data = data
+
+
 def domain_registration():
     sys.stdin = open(0)
     while True:
@@ -104,21 +119,6 @@ def domain_registration():
     print('So long, and thanks for all the fish!')
 
 
-class DNSResourceRecord:
-    domain_name: string
-    record_class: CLASS
-    record_type: QTYPE
-    ttl: int
-    data: string
-
-    def __init__(self, domain_name, record_class, record_type, data, ttl=300):
-        self.domain_name = domain_name
-        self.record_type = record_type
-        self.record_class = record_class
-        self.ttl = ttl
-        self.data = data
-
-
 def check_domain_entry(domain_name, domain_class):
     result_entry = []
     resource_records = pickle.load(open("records.p", "rb"))
@@ -134,13 +134,13 @@ def check_domain_entry(domain_name, domain_class):
 
 
 def get_data_by_type(record_type, data):
-    if record_type == QTYPE[1]:
+    if record_type == QTYPE[1] and validate_domain_data(QTYPE[1], data):
         return 1, A(data)
-    elif record_type == QTYPE[5]:
+    elif record_type == QTYPE[5] and validate_domain_data(QTYPE[5], data):
         return 5, CNAME(data)
-    elif record_type == QTYPE[16]:
+    elif record_type == QTYPE[16] and validate_domain_data(QTYPE[16], data):
         return 16, TXT(data)
-    elif record_type == QTYPE[28]:
+    elif record_type == QTYPE[28] and validate_domain_data(QTYPE[28], data):
         return 28, AAAA(data)
     else:
         return None
