@@ -57,8 +57,6 @@ www.google.com.		3600	IN	A	1.2.3.4
 
 ###### TODO: For now this server is only handling UDP Datagrams, a further improvement would be to finish TCP support to be able to handle a wider range of tools.
 
-###### TODO: When asking for an A record, for example, if the domain is a CNAME entryt a normal DNS Server would handle the hierarchy of answers until it finds an A record to send back. Further improvement is needed to handle this kind of DNS question
-
 ## Tests
 
 Unit tests for this project should be placed at ./test/ folder and must added any time a new feature / function is supposed to be developed.
