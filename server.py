@@ -119,17 +119,21 @@ def domain_registration():
     print('So long, and thanks for all the fish!')
 
 
-def check_domain_entry(domain_name, domain_class):
+def check_domain_entry(domain_name, domain_class, domain_type):
     result_entry = []
     resource_records = pickle.load(open("records.p", "rb"))
     for name, record in resource_records:
-        if name != str(domain_name)[:-1]:
+        if name != str(domain_name)[:-1] and name != str(domain_name):
             continue
-        # TODO Handle CNAME sequence
         if isinstance(record, DNSResourceRecord) \
-                and record.domain_name == str(domain_name)[:-1] \
+                and (record.domain_name == str(domain_name)[:-1] or record.domain_name == str(domain_name)) \
                 and record.record_class == domain_class:
             result_entry.append(record)
+            if record.record_type != domain_type:
+                next_entries = check_domain_entry(record.data, domain_class, domain_type)
+                for entry in next_entries:
+                    result_entry.append(entry)
+            break
     return result_entry
 
 
@@ -166,7 +170,7 @@ def handle_domain_entries(request, entries):
 
 def db_lookup(request):
     question = request.q
-    domain_entries = check_domain_entry(question.qname, CLASS[question.qclass])
+    domain_entries = check_domain_entry(question.qname, CLASS[question.qclass], QTYPE[question.qtype])
     return handle_domain_entries(request, domain_entries)
 
 
@@ -183,6 +187,7 @@ def handle_dns_client(data):
 def handle_domain_registration(data_str):
     resource_records = pickle.load(open("records.p", "rb"))
 
+    # TODO update registration of already existing domain names
     domain_dic = validate_new_domain(data_str)
     if domain_dic is None:
         print("FAILED to validate: [%s]" % data_str)
