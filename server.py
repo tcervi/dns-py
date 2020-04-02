@@ -119,6 +119,15 @@ def domain_registration():
     print('So long, and thanks for all the fish!')
 
 
+def assemble_records_answer(record, domain_class, domain_type):
+    records_list = [record]
+    if record.record_type != domain_type:
+        next_entries = check_domain_entry(record.data, domain_class, domain_type)
+        for entry in next_entries:
+            records_list.append(entry)
+    return records_list
+
+
 def check_domain_entry(domain_name, domain_class, domain_type):
     result_entry = []
     resource_records = pickle.load(open("records.p", "rb"))
@@ -128,11 +137,7 @@ def check_domain_entry(domain_name, domain_class, domain_type):
         if isinstance(record, DNSResourceRecord) \
                 and (record.domain_name == str(domain_name)[:-1] or record.domain_name == str(domain_name)) \
                 and record.record_class == domain_class:
-            result_entry.append(record)
-            if record.record_type != domain_type:
-                next_entries = check_domain_entry(record.data, domain_class, domain_type)
-                for entry in next_entries:
-                    result_entry.append(entry)
+            result_entry = assemble_records_answer(record, domain_class, domain_type)
             break
     return result_entry
 
