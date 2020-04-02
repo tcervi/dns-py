@@ -31,6 +31,9 @@ except ImportError:
     install('prompt_toolkit')
 
 
+PERSISTENT_RECORDS = "records.p"
+
+
 class BaseRequestHandler(socketserver.BaseRequestHandler):
 
     def get_data(self):
@@ -130,7 +133,7 @@ def assemble_records_answer(record, domain_class, domain_type):
 
 def check_domain_entry(domain_name, domain_class, domain_type):
     result_entry = []
-    resource_records = pickle.load(open("records.p", "rb"))
+    resource_records = pickle.load(open(PERSISTENT_RECORDS, "rb"))
     for name, record in resource_records:
         if name != str(domain_name)[:-1] and name != str(domain_name):
             continue
@@ -151,14 +154,14 @@ def check_domain_name_exists(domain_name, resource_records):
 
 
 def remove_record_by_name(domain_name):
-    resource_records = pickle.load(open("records.p", "rb"))
+    resource_records = pickle.load(open(PERSISTENT_RECORDS, "rb"))
     new_records = []
     for name, record in resource_records:
         if name == str(domain_name)[:-1] or name == str(domain_name):
             continue
         new_records.append([name, record])
 
-    pickle.dump(new_records, open("records.p", "wb"))
+    pickle.dump(new_records, open(PERSISTENT_RECORDS, "wb"))
 
 
 def get_data_by_type(record_type, data):
@@ -209,7 +212,7 @@ def handle_dns_client(data):
 
 
 def handle_domain_registration(data_str):
-    resource_records = pickle.load(open("records.p", "rb"))
+    resource_records = pickle.load(open(PERSISTENT_RECORDS, "rb"))
 
     domain_dic = validate_new_domain(data_str)
     if domain_dic is None:
@@ -221,12 +224,12 @@ def handle_domain_registration(data_str):
     if new_record is not None:
         if check_domain_name_exists(new_record.domain_name, resource_records):
             remove_record_by_name(new_record.domain_name)
-            resource_records = pickle.load(open("records.p", "rb"))
+            resource_records = pickle.load(open(PERSISTENT_RECORDS, "rb"))
 
         resource_records.append([new_record.domain_name, new_record])
         print("Registered domain: [%s %s %s %s]" %
               (new_record.domain_name, new_record.record_class, new_record.record_type, new_record.data))
-        pickle.dump(resource_records, open("records.p", "wb"))
+        pickle.dump(resource_records, open(PERSISTENT_RECORDS, "wb"))
     else:
         print("FAILED to create new record: [%s]" % domain_dic)
         return False
@@ -359,11 +362,11 @@ def main():
 
     # starting server with one fake entry (first run)
     # not mandatory, can be removed later
-    resource_records = pickle.load(open("records.p", "rb"))
+    resource_records = pickle.load(open(PERSISTENT_RECORDS, "rb"))
     if len(resource_records) == 0:
         record = DNSResourceRecord("www.google.com", "A", "IN", "1.2.3.4", 3600)
         dns_resource_records = [[record.domain_name, record]]
-        pickle.dump(dns_resource_records, open("records.p", "wb"))
+        pickle.dump(dns_resource_records, open(PERSISTENT_RECORDS, "wb"))
 
     # starting cli process for registration
     registration_process = Process(target=domain_registration)
