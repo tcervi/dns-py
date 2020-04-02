@@ -147,6 +147,12 @@ def get_data_by_type(record_type, data):
 
 
 def handle_domain_entries(request, entries):
+    # handling reply message for record not found
+    if len(entries) == 0:
+        answer = DNSRecord(DNSHeader(id=request.header.id, rcode=RCODE.NXDOMAIN, qr=1, ra=1), q=request.q)
+        return answer.pack()
+
+    # handling successful message for record found
     answer = DNSRecord(DNSHeader(id=request.header.id, qr=1, aa=1, ra=1), q=request.q)
     for entry in entries:
         data = get_data_by_type(entry.record_type, entry.data)
@@ -161,11 +167,7 @@ def handle_domain_entries(request, entries):
 def db_lookup(request):
     question = request.q
     domain_entries = check_domain_entry(question.qname, CLASS[question.qclass])
-    if len(domain_entries) != 0:
-        return handle_domain_entries(request, domain_entries)
-    else:
-        # TODO Handle error
-        return None
+    return handle_domain_entries(request, domain_entries)
 
 
 def handle_dns_client(data):
