@@ -142,6 +142,25 @@ def check_domain_entry(domain_name, domain_class, domain_type):
     return result_entry
 
 
+def check_domain_name_exists(domain_name, resource_records):
+    for name, record in resource_records:
+        if name == str(domain_name)[:-1] or name == str(domain_name):
+            return True
+    else:
+        return False
+
+
+def remove_record_by_name(domain_name):
+    resource_records = pickle.load(open("records.p", "rb"))
+    new_records = []
+    for name, record in resource_records:
+        if name == str(domain_name)[:-1] or name == str(domain_name):
+            continue
+        new_records.append([name, record])
+
+    pickle.dump(new_records, open("records.p", "wb"))
+
+
 def get_data_by_type(record_type, data):
     if record_type == QTYPE[1] and validate_domain_data(QTYPE[1], data):
         return 1, A(data)
@@ -192,7 +211,6 @@ def handle_dns_client(data):
 def handle_domain_registration(data_str):
     resource_records = pickle.load(open("records.p", "rb"))
 
-    # TODO update registration of already existing domain names
     domain_dic = validate_new_domain(data_str)
     if domain_dic is None:
         print("FAILED to validate: [%s]" % data_str)
@@ -201,6 +219,10 @@ def handle_domain_registration(data_str):
     new_record = DNSResourceRecord(domain_dic['domain_name'], domain_dic['class'],
                                    domain_dic['qtype'], domain_dic['data'], domain_dic['ttl'])
     if new_record is not None:
+        if check_domain_name_exists(new_record.domain_name, resource_records):
+            remove_record_by_name(new_record.domain_name)
+            resource_records = pickle.load(open("records.p", "rb"))
+
         resource_records.append([new_record.domain_name, new_record])
         print("Registered domain: [%s %s %s %s]" %
               (new_record.domain_name, new_record.record_class, new_record.record_type, new_record.data))
